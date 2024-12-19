@@ -1,0 +1,33 @@
+# DO NOT include azure-functions-worker in this file
+# The Python Worker is managed by Azure Functions platform
+# Manually managing azure-functions-worker may cause unexpected issues
+
+azure-functions
+requests
+openai
+azure-storage-blob
+azure-ai-formrecognizer
+python-dotenv 
+langchain 
+langchain-community 
+langchain-openai 
+langchainhub 
+tiktoken 
+azure-ai-documentintelligence 
+azure-identity 
+azure-search-documents==11.6.0b4
+azure-cosmos
+ipdb
+fastapi
+uvicorn
+azure-functions
+python-multipart
+timedelta
+fastapi-azure-auth
+
+python-pptx
+python-docx 
+python-magic
+openpyxl 
+pdfkit
+fpdf

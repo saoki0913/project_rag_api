@@ -23,7 +23,6 @@ uvicorn
 azure-functions
 python-multipart
 timedelta
-fastapi-azure-auth
 
 python-pptx
 python-docx 

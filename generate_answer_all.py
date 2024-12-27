@@ -12,6 +12,7 @@ from operator import itemgetter
 from langchain.schema.runnable import RunnableMap
 
 
+
 # 環境変数から設定を取得
 openai_embedding_key = os.getenv("AZURE_OPENAI_EMBEDDING_API_KEY")
 openai_embedding_endpoint = os.getenv("AZURE_OPENAI_EMBEDDING_ENDPOINT")
@@ -21,26 +22,36 @@ azure_search_key = os.getenv("AZURE_SEARCH_ADMIN_KEY")
 openai.api_key = os.getenv("AZURE_OPENAI_API_KEY")
 openai.azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")  
 
-def generate_answer(user_question, project_name):
+def generate_answer_all(user_question, container):
     """
     質問に基づいて応答を生成。
     """
     try:
-        index_name = f"{project_name}-index"
-        retriever = AzureSearch(
-            azure_search_endpoint=azure_search_endpoint,
-            azure_search_key=azure_search_key,
-            index_name=index_name,
-            embedding_function=AzureOpenAIEmbeddings(
-                azure_deployment="text-embedding-ada-002",
-                openai_api_version="2023-05-15",
-                openai_api_key=openai_embedding_key,
-                azure_endpoint=openai_embedding_endpoint,
-            ).embed_query,
-        ).as_retriever(search_type="similarity")
+        # クエリを実行して project_name を抽出
+        project_names = []
+        retrieved_docses = []
+        query = "SELECT c.project_name FROM c"  # 必要なフィールドのみ取得
+        for item in container.query_items(query=query, enable_cross_partition_query=True):
+            project_names.append(item["project_name"])  # project_name をリストに追加
+        
+        # すべてプロジェクトに関してベクトル検索を実行
+        for project_name in project_names:
+            index_name = f"{project_name}-index"
+            retriever = AzureSearch(
+                azure_search_endpoint=azure_search_endpoint,
+                azure_search_key=azure_search_key,
+                index_name=index_name,
+                embedding_function=AzureOpenAIEmbeddings(
+                    azure_deployment="text-embedding-ada-002",
+                    openai_api_version="2023-05-15",
+                    openai_api_key=openai_embedding_key,
+                    azure_endpoint=openai_embedding_endpoint,
+                ).embed_query,
+            ).as_retriever(search_type="similarity")
 
-        retrieved_docs = retriever.get_relevant_documents(user_question)[:3]
-        logging.info(f"retrieved_docs: {retrieved_docs}")
+            retrieved_docs = retriever.get_relevant_documents(user_question)[:3]
+            retrieved_docses.append(retrieved_docs)
+            logging.info(f"retrieved_docs: {retrieved_docs}")
 
         llm = AzureChatOpenAI(
             openai_api_key=openai.api_key,

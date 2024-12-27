@@ -1,4 +1,5 @@
 import os
+import logging
 from azure.search.documents.indexes.models import (
     SearchIndex,
     SearchFieldDataType,
@@ -70,6 +71,8 @@ def create_project_index(project_name:str, spo_url:str):
         #semantic_search = create_semantic_search()
         scoring_profiles, default_scoring_profile = create_scoring_profiles()
 
+        logging.info("Success creating index")
+
         return SearchIndex(
             name=f"{project_name}-index",
             fields = fields,
@@ -79,8 +82,10 @@ def create_project_index(project_name:str, spo_url:str):
             default_scoring_profile = default_scoring_profile, # 任意
         )
 
+
+    #index作成に失敗したときにログを表示
     except Exception as e:
-        print(f"Error creating index: {e}")
+        logging.error(f"Error creating index: {e}")
 
 
 def create_vector_search(
@@ -207,3 +212,11 @@ def create_scoring_profiles(
     default_scoring_profile = scoring_profile_name
 
     return scoring_profiles, default_scoring_profile
+
+
+if __name__ == "__main__":
+
+    # 関数を呼び出してindexを作成
+    create_project_index(
+        project_name="test", spo_url = "test"
+    )

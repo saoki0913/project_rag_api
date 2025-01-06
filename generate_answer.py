@@ -89,15 +89,25 @@ def generate_answer(user_question, project_name):
         #一番関連度の高い資料の情報も取得
         answer_data = rag_chain_with_source.invoke(user_question)
         answer = answer_data["answer"]
-        documentUrl = answer_data["documents"][0]["documentUrl"]
-        documentName = answer_data["documents"][0]["documentName"]
-        last_modified = answer_data["documents"][0]["last_modified"]
+        documentUrl_list, documentName_list, last_modified_list = [], [], []
+
+        #最も関連度の高い資料をリストに追加
+        documentUrl_list.append(answer_data["documents"][0]["documentUrl"])
+        documentName_list.append(answer_data["documents"][0]["documentName"])
+        last_modified_list.append(answer_data["documents"][0]["last_modified"])
+
+        for i in range(2):
+            # 異なる関連ドキュメントが存在する場合はリストに追加
+            if answer_data["documents"][i]["documentUrl"] != answer_data["documents"][i+1]["documentUrl"]:
+                documentUrl_list.append(answer_data["documents"][i+1]["documentUrl"])
+                documentName_list.append(answer_data["documents"][i+1]["documentName"])
+                last_modified_list.append(answer_data["documents"][i+1]["last_modified"])
         
         content={
             "answer": answer,
-            "documentUrl": documentUrl,
-            "documentName": documentName,
-            "last_modified": last_modified,
+            "documentUrl": documentUrl_list,
+            "documentName": documentName_list,
+            "last_modified": last_modified_list,
         }
         return content
 

@@ -29,7 +29,7 @@ def generate_answer_all(user_question, container):
     try:
         # クエリを実行して project_name を抽出
         project_names = []
-        retrieved_docses = []
+        retrieved_docs_list = []
         query = "SELECT c.project_name FROM c"  # 必要なフィールドのみ取得
         for item in container.query_items(query=query, enable_cross_partition_query=True):
             project_names.append(item["project_name"])  # project_name をリストに追加
@@ -50,8 +50,21 @@ def generate_answer_all(user_question, container):
             ).as_retriever(search_type="similarity")
 
             retrieved_docs = retriever.get_relevant_documents(user_question)[:3]
-            retrieved_docses.append(retrieved_docs)
             logging.info(f"retrieved_docs: {retrieved_docs}")
+
+            # retrieved_docs の要素を展開して追加
+            for doc in retrieved_docs:
+                retrieved_docs_list.append(doc)
+
+        # @search.score が大きい順に並べ替え
+        retrieved_docs_list = sorted(
+            retrieved_docs_list,
+            key=lambda x: x.metadata.get('@search.score', 0),  # @search.score を基準にソート
+            reverse=True  # 降順にソート
+        )
+        #検索結果を上位三件に絞る
+        retrieved_docs_list = retrieved_docs_list[:3]
+        logging.info(f"retrieved_docs sorted by @search.score: {retrieved_docs_list}")
 
         llm = AzureChatOpenAI(
             openai_api_key=openai.api_key,
@@ -100,15 +113,25 @@ def generate_answer_all(user_question, container):
         #一番関連度の高い資料の情報も取得
         answer_data = rag_chain_with_source.invoke(user_question)
         answer = answer_data["answer"]
-        documentUrl = answer_data["documents"][0]["documentUrl"]
-        documentName = answer_data["documents"][0]["documentName"]
-        last_modified = answer_data["documents"][0]["last_modified"]
+        documentUrl_list, documentName_list, last_modified_list = [], [], []
+
+        #最も関連度の高い資料をリストに追加
+        documentUrl_list.append(answer_data["documents"][0]["documentUrl"])
+        documentName_list.append(answer_data["documents"][0]["documentName"])
+        last_modified_list.append(answer_data["documents"][0]["last_modified"])
+
+        for i in range(2):
+            # 異なる関連ドキュメントが存在する場合はリストに追加
+            if answer_data["documents"][i]["documentUrl"] != answer_data["documents"][i+1]["documentUrl"]:
+                documentUrl_list.append(answer_data["documents"][i+1]["documentUrl"])
+                documentName_list.append(answer_data["documents"][i+1]["documentName"])
+                last_modified_list.append(answer_data["documents"][i+1]["last_modified"])
         
         content={
             "answer": answer,
-            "documentUrl": documentUrl,
-            "documentName": documentName,
-            "last_modified": last_modified,
+            "documentUrl": documentUrl_list,
+            "documentName": documentName_list,
+            "last_modified": last_modified_list,
         }
         return content
 

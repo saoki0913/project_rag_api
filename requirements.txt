@@ -23,10 +23,3 @@ uvicorn
 azure-functions
 python-multipart
 timedelta
-
-python-pptx
-python-docx 
-python-magic
-openpyxl 
-pdfkit
-fpdf

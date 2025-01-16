@@ -20,7 +20,8 @@ from create_indexer import create_project_indexer
 from create_datasource import create_project_data_source
 from generate_answer import generate_answer
 from generate_answer_all import generate_answer_all
-from utils import check_spo_url
+from utils import check_spo_url, get_spo_url_by_project_name
+from SharePoint import SharePointAccessClass
 
 # 環境変数から設定を取得
 intelligence_key = os.getenv("DOCUMENT_INTELLIGENCE_API_KEY")
@@ -36,7 +37,16 @@ cosmos_endpoint = os.getenv("COSMOS_DB_ENDPOINT")
 cosmos_key = os.getenv("COSMOS_DB_KEY")
 cosmos_database_name = "ProjectDatabase"
 cosmos_container_name = "Projects"
+# SPO
+client_id = os.getenv("SPO_APPLICATION_ID")
+client_secret = os.getenv("SPO_APPLICATION_SECRET")
+tenant_id = os.getenv("SPO_TENANT_ID")
 
+# SharePointサイトの情報
+SITE_NAME = "Test"  # SharePointサイトの名前
+FOLDER_NAME = "Shared Documents"  # フォルダのルート名 (サブフォルダ名があれば指定)
+# SPOクラスの初期化
+sharepoint = SharePointAccessClass(client_id, client_secret, tenant_id)
 
 # FastAPI アプリケーションの初期化
 app = FastAPI()
@@ -45,6 +55,7 @@ app = FastAPI()
 class AnswerRequest(BaseModel):
     user_question: str
     project_name: str
+    folder_name:str = None  # オプション項目（指定がない場合はNone）
     conversation_id: str = None  # オプション項目（指定がない場合はNone）
 
 class RegisterProjectRequest(BaseModel):
@@ -52,6 +63,9 @@ class RegisterProjectRequest(BaseModel):
     spo_url: str
 
 class DeleteProjectRequest(BaseModel):
+    project_name: str
+
+class GetSpoFoldersRequest(BaseModel):
     project_name: str
 
 # クライアントの初期化
@@ -63,6 +77,47 @@ cosmos_client = CosmosClient(cosmos_endpoint, cosmos_key)
 database = cosmos_client.get_database_client(cosmos_database_name)
 container = database.get_container_client(cosmos_container_name)
 
+@app.post("/get_spo_folders")
+async def get_spo_folders(request:GetSpoFoldersRequest):
+    """
+    SPOのURLから、それに対応したサイト名を検索し、そのサイト内のフォルダ一覧を返すエンドポイント。
+    """
+    try:
+        # サイトIDを取得
+        project_name = request.project_name
+        spo_url = await get_spo_url_by_project_name(project_name)
+        sites_data = sharepoint.get_sites()
+
+        # サイト一覧から 'webUrl' が target_url に一致するサイトを検索
+        matching_site = next(
+            (site for site in sites_data.get("value", []) if site.get("webUrl") == spo_url),
+            None
+        )
+
+
+        site_name = matching_site["name"]
+        site_id = sharepoint.get_site_id(site_name)
+
+        logging.info(f"サイト '{site_name}' のIDを取得しました")
+        if not site_id:
+            logging.warning(f"サイト '{site_name}' が見つかりませんでした")
+            exit()
+
+        # フォルダ一覧を取得
+        folder_list = []
+        folders = sharepoint.get_folders(site_id, "root")  # "root" を指定すると、ルートフォルダ配下を取得
+        if folders and "value" in folders:
+            for folder in folders["value"]:
+                folder_list.append(folder['name'])
+            logging.info(f"フォルダ一list:{folder_list}" )
+        else:
+            logging.warning("フォルダが見つかりませんでした")
+        logging.info("フォルダの取得に成功しました")
+        return JSONResponse(content={"folders": folder_list})
+    except Exception as e:
+        logging.error(f"フォルダ一覧取得エラー: {e}")
+        raise HTTPException(status_code=500, detail="フォルダ一覧の取得中にエラーが発生しました")
+    
 
 @app.post("/resist_project")
 async def resist_project(request: RegisterProjectRequest):
@@ -186,17 +241,19 @@ async def answer(request: AnswerRequest):
     try:
         user_question = request.user_question
         project_name = request.project_name
+        folder_name = request.folder_name
         project_name = project_name.lower() #プロジェクト名を小文字に変換
 
         # プロジェクトが選択されていないときはすべてのプロジェクトを検索して回答する．
         if project_name == "all":
             answer = generate_answer_all(user_question, container)
         else:
-            answer = generate_answer(user_question, project_name)
+            answer = generate_answer(user_question, project_name, folder_name)
         logging.info("質問への回答に成功しました")       
         return JSONResponse(answer)
     
     except Exception as e:
         logging.error(f"回答生成エラー: {e}")
         raise HTTPException(status_code=500, detail="回答の生成に失敗")
+
 

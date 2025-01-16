@@ -29,6 +29,7 @@ async def create_project_data_source(project_name:str, spo_url:str):
         data_source_name = f"{project_name}-datasource"
         spo_url = spo_url
         sharepoint_connection_string = f"SharePointOnlineEndpoint={spo_url};ApplicationId={ApplicationId};ApplicationSecret={ApplicationSecret};TenantId={TenantId};" #社内用 URL version
+        # https://intelligentforce0401.sharepoint.com/sites/Test/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FTest%2FShared%20Documents%2Ftest&viewid=d0948e95%2D5e9a%2D43cc%2D8630%2D6006ca74a7e3
         # sharepoint_connection_string = f"SharePointOnlineEndpoint=https://intelligentforce0401.sharepoint.com/sites/{project_name};ApplicationId={ApplicationId};ApplicationSecret={ApplicationSecret};TenantId={TenantId};" #社内用
         # sharepoint_connection_string = f"SharePointOnlineEndpoint={spo_url};ApplicationId={ApplicationId};ApplicationSecret={ApplicationSecret};TenantId={TenantId};" #社外用
         # Datasource の作成 (非同期)       

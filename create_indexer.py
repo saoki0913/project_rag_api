@@ -5,6 +5,9 @@ from azure.search.documents.indexes.models import (
     SearchIndexer,
     IndexingSchedule,
     IndexingParameters,
+    IndexingParametersConfiguration ,
+    FieldMapping,
+    FieldMappingFunction,
     BlobIndexerImageAction
 )
 
@@ -47,6 +50,21 @@ def create_project_indexer(project_name:str, spo_url:str):
         }
         )
 
+        field_mappings_function = FieldMappingFunction(
+            name="extractTokenAtPosition",
+            parameters={
+                "delimiter": "/",
+                "position": 4
+            }
+        )
+
+        field_mappings = FieldMapping(
+            source_field_name="metadata_spo_item_path",
+            target_field_name="folderName",
+            mapping_function=field_mappings_function
+        )
+
+
         indexer = SearchIndexer(  
             name=indexer_name,  
             description="Indexer to index documents and generate embeddings",  
@@ -54,7 +72,8 @@ def create_project_indexer(project_name:str, spo_url:str):
             schedule=schedule,  
             target_index_name=index_name,  
             data_source_name=data_source_name,
-            parameters=indexer_parameters
+            parameters=indexer_parameters,
+            field_mappings=[field_mappings]
         ) 
 
         logging.info("Success creating indexer")

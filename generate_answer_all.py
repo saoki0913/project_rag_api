@@ -110,7 +110,7 @@ def generate_answer_all(user_question, container):
         }
 
         # 会話の回答生成
-        #一番関連度の高い資料の情報も取得
+        #関連度の高い資料の情報も取得
         answer_data = rag_chain_with_source.invoke(user_question)
         answer = answer_data["answer"]
         documentUrl_list, documentName_list, last_modified_list = [], [], []

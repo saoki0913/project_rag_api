@@ -37,6 +37,7 @@ async def create_project_skillset(project_name:str, spo_url:str):
         skillset_payload = {
             "name": skillset_name,
             "skills": [
+                # DocumentIntelligenceLayoutSkill
                 {
                     "@odata.type": "#Microsoft.Skills.Util.DocumentIntelligenceLayoutSkill",
                     "name": "my_document_intelligence_layout_skill",
@@ -51,6 +52,7 @@ async def create_project_skillset(project_name:str, spo_url:str):
                     "outputMode": "oneToMany",
                     "markdownHeaderDepth": "h3",
                 },
+                # SplitSkill
                 {
                     "@odata.type": "#Microsoft.Skills.Text.SplitSkill",
                     "name": "my_text_split_skill",
@@ -69,6 +71,7 @@ async def create_project_skillset(project_name:str, spo_url:str):
                     "maximumPageLength": 2000,
                     "pageOverlapLength": 500,
                 },
+                # AzureOpenAIEmbeddingSkill
                 {
                     "@odata.type": "#Microsoft.Skills.Text.AzureOpenAIEmbeddingSkill",
                     "name": "my_azure_openai_embedding_skill",
@@ -100,6 +103,7 @@ async def create_project_skillset(project_name:str, spo_url:str):
                             {"name": "libraryId", "source": "/document/metadata_spo_library_id"},
                             {"name": "documentId", "source": "/document/metadata_spo_item_id"},
                             {"name": "documentPath", "source": "/document/metadata_spo_item_path"},
+                            {"name": "folderName", "source": "/document/folderName"}, 
                             {"name": "documentName", "source": "/document/metadata_spo_item_name"},
                             {"name": "documentUrl", "source": "/document/metadata_spo_item_weburi"},
                             {"name": "last_modified", "source": "/document/metadata_spo_item_last_modified"},

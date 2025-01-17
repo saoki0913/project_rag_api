@@ -14,14 +14,10 @@ from azure.cosmos import CosmosClient, exceptions
 import ipdb
 
 #import mylibraly
-from create_index import create_project_index
-from create_skillset_documentintelligence import create_project_skillset
-from create_indexer import create_project_indexer
-from create_datasource import create_project_data_source
-from generate_answer import generate_answer
-from generate_answer_all import generate_answer_all
-from utils import check_spo_url, get_spo_url_by_project_name
+from generate_answer import generate_answer, generate_answer_all
+from utils import check_spo_url, get_spo_url_by_project_name, get_site_info_by_url, fetch_folders, delete_project_resources
 from SharePoint import SharePointAccessClass
+from indexing_service import ProjectIndexingService
 
 # 環境変数から設定を取得
 intelligence_key = os.getenv("DOCUMENT_INTELLIGENCE_API_KEY")
@@ -42,11 +38,11 @@ client_id = os.getenv("SPO_APPLICATION_ID")
 client_secret = os.getenv("SPO_APPLICATION_SECRET")
 tenant_id = os.getenv("SPO_TENANT_ID")
 
-# SharePointサイトの情報
-SITE_NAME = "Test"  # SharePointサイトの名前
-FOLDER_NAME = "Shared Documents"  # フォルダのルート名 (サブフォルダ名があれば指定)
 # SPOクラスの初期化
 sharepoint = SharePointAccessClass(client_id, client_secret, tenant_id)
+
+# indexingクラスの初期化
+search_indexing = ProjectIndexingService()
 
 # FastAPI アプリケーションの初期化
 app = FastAPI()
@@ -89,31 +85,19 @@ async def get_spo_folders(request:GetSpoFoldersRequest):
         sites_data = sharepoint.get_sites()
 
         # サイト一覧から 'webUrl' が target_url に一致するサイトを検索
-        matching_site = next(
-            (site for site in sites_data.get("value", []) if site.get("webUrl") == spo_url),
-            None
-        )
-
-
+        matching_site = get_site_info_by_url(sites_data, spo_url)
         site_name = matching_site["name"]
         site_id = sharepoint.get_site_id(site_name)
 
         logging.info(f"サイト '{site_name}' のIDを取得しました")
         if not site_id:
-            logging.warning(f"サイト '{site_name}' が見つかりませんでした")
-            exit()
+            logging.error(f"サイト '{site_name}' が見つかりませんでした")
+            exit()               
 
         # フォルダ一覧を取得
-        folder_list = []
-        folders = sharepoint.get_folders(site_id, "root")  # "root" を指定すると、ルートフォルダ配下を取得
-        if folders and "value" in folders:
-            for folder in folders["value"]:
-                folder_list.append(folder['name'])
-            logging.info(f"フォルダ一list:{folder_list}" )
-        else:
-            logging.warning("フォルダが見つかりませんでした")
-        logging.info("フォルダの取得に成功しました")
+        folder_list = fetch_folders(sharepoint, site_id, root_folder="root")
         return JSONResponse(content={"folders": folder_list})
+    
     except Exception as e:
         logging.error(f"フォルダ一覧取得エラー: {e}")
         raise HTTPException(status_code=500, detail="フォルダ一覧の取得中にエラーが発生しました")
@@ -147,10 +131,10 @@ async def resist_project(request: RegisterProjectRequest):
             logging.info(f"新規インデックス '{index_name}' を作成します。")
            
             # 非同期でdatasource作成
-            await create_project_data_source(project_name, spo_url)
+            await search_indexing.create_project_data_source(project_name, spo_url)
 
             # indexの作成
-            index = create_project_index(project_name, spo_url)
+            index = search_indexing.create_project_index(project_name)
             index_client.delete_index(index)
             index_client.create_or_update_index(index) # 指定したインデックス名が既存の場合上書きする
 
@@ -159,10 +143,10 @@ async def resist_project(request: RegisterProjectRequest):
             # indexer_client.create_or_update_skillset(skillset)
 
             # 非同期でskillset作成
-            await create_project_skillset(project_name, spo_url)
+            await search_indexing.create_project_skillset_layout(project_name)
 
             # indexerの作成
-            indexer = create_project_indexer(project_name, spo_url)
+            indexer = search_indexing.create_project_indexer(project_name)
             indexer_client.create_or_update_indexer(indexer)
 
             # Cosmos DB にプロジェクトを保存
@@ -202,31 +186,12 @@ async def delete_item_by_project_name(request:DeleteProjectRequest):
     """
     try:
         project_name = request.project_name
-        project_name = project_name.lower() #プロジェクト名を小文字に変換
-
-        #index, Skillset, datasource ,indexerの名前
-        index_name = f"{project_name}-index"
-        data_source_name = f"{project_name}-datasource"
-        skillset_name = f"{project_name}-skillset"
-        indexer_name = f"{project_name}-indexer"
-    
-        #index, Skillset, datasource ,indexerの削除
-        indexer_client.delete_indexer(indexer_name)
-        indexer_client.delete_skillset(skillset_name)
-        indexer_client.delete_data_source_connection(data_source_name)
-        index_client.delete_index(index_name)
-
-        # クエリで project_name に一致するアイテムを検索
-        query = "SELECT * FROM Projects p WHERE p.project_name = @project_name"
-        parameters = [{"name": "@project_name", "value": project_name}]
-        item = list(container.query_items(query=query, parameters=parameters, enable_cross_partition_query=True))
-        if not item:
-            logging.warning(f"'{project_name}' に一致するプロジェクトが見つかりません。")
-            return
-
-        # 検索結果からアイテムを削除   
-        container.delete_item(item=item[0]["id"], partition_key=item[0]["project_name"])
-        logging.info(f"プロジェクト '{project_name}' を削除しました。")
+        delete_project_resources(
+                project_name,
+                indexer_client,
+                index_client,
+                container
+            )
 
     except exceptions.CosmosHttpResponseError as e:
         logging.error(f"プロジェクト削除エラー: {e}")

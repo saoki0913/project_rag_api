@@ -210,7 +210,7 @@ async def answer(request: AnswerRequest):
         project_name = project_name.lower() #プロジェクト名を小文字に変換
 
         # プロジェクトが選択されていないときはすべてのプロジェクトを検索して回答する．
-        if project_name == "all":
+        if project_name == "project_all":
             answer = generate_answer_all(user_question, container)
         else:
             answer = generate_answer(user_question, project_name, folder_name)

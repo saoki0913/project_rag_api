@@ -1,6 +1,7 @@
 import os
 import logging
 import requests
+import ipdb
 
 # LangChain / OpenAI 関連
 import openai
@@ -92,10 +93,11 @@ def generate_answer(user_question: str, project_name: str, folder_name: str=None
     """
     try:
         index_name = f"{project_name}-index"
+        # ipdb.set_trace()
 
         # folderName が指定されていれば、"folderName eq '...'" の形式でフィルタを構築
         filter_condition = None
-        if folder_name != "all":
+        if folder_name != "FOLDER_ALL":
             filter_condition = f"folderName eq '{folder_name}'"
 
         # vectorFilterModeを用いてベクトル検索にfolderNameでのフィルタリングを追加

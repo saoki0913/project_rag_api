@@ -74,6 +74,7 @@ class ProjectIndexingService:
                 SimpleField(name="documentId", type=SearchFieldDataType.String,  stored=True, searchable=True, sortable=True, filterable=True),
                 SearchableField(name="documentPath", type=SearchFieldDataType.String,  stored=True, searchable=True, filterable=True),
                 SimpleField(name="folderName", type=SearchFieldDataType.String,  stored=True, searchable=False, filterable=True),
+                SimpleField(name="subfolderName", type=SearchFieldDataType.String,  stored=True, searchable=False, filterable=True),
                 SearchableField(name="documentName", type=SearchFieldDataType.String, stored=True, searchable=True, filterable=True),
                 SearchableField(name="documentUrl", type=SearchFieldDataType.String, stored=True, searchable=True, filterable=True),
                 SimpleField(name="last_modified", type=SearchFieldDataType.DateTimeOffset, filterable=True, sortable=True, stored=True),
@@ -310,7 +311,8 @@ class ProjectIndexingService:
                                 {"name": "libraryId", "source": "/document/metadata_spo_library_id"},
                                 {"name": "documentId", "source": "/document/metadata_spo_item_id"},
                                 {"name": "documentPath", "source": "/document/metadata_spo_item_path"},
-                                {"name": "folderName", "source": "/document/folderName"}, 
+                                {"name": "folderName", "source": "/document/folderName"},
+                                {"name": "subfolderName", "source": "/document/subfolderName"}, 
                                 {"name": "documentName", "source": "/document/metadata_spo_item_name"},
                                 {"name": "documentUrl", "source": "/document/metadata_spo_item_weburi"},
                                 {"name": "last_modified", "source": "/document/metadata_spo_item_last_modified"},
@@ -462,7 +464,7 @@ class ProjectIndexingService:
             }
             )
 
-            field_mappings_function = FieldMappingFunction(
+            folder_field_mappings_function = FieldMappingFunction(
                 name="extractTokenAtPosition",
                 parameters={
                     "delimiter": "/",
@@ -470,12 +472,27 @@ class ProjectIndexingService:
                 }
             )
 
-            field_mappings = FieldMapping(
+            folder_field_mappings = FieldMapping(
                 source_field_name="metadata_spo_item_path",
                 target_field_name="folderName",
-                mapping_function=field_mappings_function
+                mapping_function=folder_field_mappings_function
             )
 
+            subfolder_field_mappings_function = FieldMappingFunction(
+                name="extractTokenAtPosition",
+                parameters={
+                    "delimiter": "/",
+                    "position": 4
+                }
+            )
+
+            subfolder_field_mappings = FieldMapping(
+                source_field_name="metadata_spo_item_path",
+                target_field_name="subfolderName",
+                mapping_function=subfolder_field_mappings_function
+            )
+
+            field_mappings = [folder_field_mappings, subfolder_field_mappings]
 
             indexer = SearchIndexer(  
                 name=indexer_name,  
@@ -485,7 +502,7 @@ class ProjectIndexingService:
                 target_index_name=index_name,  
                 data_source_name=data_source_name,
                 parameters=indexer_parameters,
-                field_mappings=[field_mappings]
+                field_mappings=field_mappings
             ) 
 
             logging.info("Success creating indexer")
@@ -494,3 +511,80 @@ class ProjectIndexingService:
         except Exception as e:
             logging.error(f"Error creating indexer: {e}")
 
+
+    def create_project_folder_indexer(self, project_name:str):
+        """
+        Create a indexer
+        """
+        try:
+            # Create an indexer for project
+            index_name = f"{project_name}-index" 
+            indexer_name = f"{project_name}-indexer" 
+            skillset_name = f"{project_name}-skillset" 
+            data_source_name = f"{project_name}-datasource"  
+
+            #インデクサーのスケジュールを設定（1日1回、現在時刻から開始）
+            schedule = IndexingSchedule(
+                interval=timedelta(days=1),  # 1日1回実行
+                start_time=datetime.utcnow()  # 現在のUTC時刻から開始
+            )
+
+            #fileデータをスキルセットに送る設定
+            indexer_parameters = IndexingParameters(
+                max_failed_items=-1,
+                max_failed_items_per_batch=-1,
+                configuration={
+                "dataToExtract": "contentAndMetadata",
+                "imageAction": "none",
+                "indexStorageMetadataOnlyForOversizedDocuments": True,
+                "failOnUnsupportedContentType": False,
+                "allowSkillsetToReadFileData": True
+            }
+            )
+
+            folder_field_mappings_function = FieldMappingFunction(
+                name="extractTokenAtPosition",
+                parameters={
+                    "delimiter": "/",
+                    "position": 4
+                }
+            )
+
+            folder_field_mappings = FieldMapping(
+                source_field_name="metadata_spo_item_path",
+                target_field_name="folderName",
+                mapping_function=folder_field_mappings_function
+            )
+
+            subfolder_field_mappings_function = FieldMappingFunction(
+                name="extractTokenAtPosition",
+                parameters={
+                    "delimiter": "/",
+                    "position": 5
+                }
+            )
+
+            subfolder_field_mappings = FieldMapping(
+                source_field_name="metadata_spo_item_path",
+                target_field_name="subfolderName",
+                mapping_function=subfolder_field_mappings_function
+            )
+
+            field_mappings = [folder_field_mappings, subfolder_field_mappings]
+
+            indexer = SearchIndexer(  
+                name=indexer_name,  
+                description="Indexer to index documents and generate embeddings",  
+                skillset_name=skillset_name,
+                schedule=schedule,  
+                target_index_name=index_name,  
+                data_source_name=data_source_name,
+                parameters=indexer_parameters,
+                field_mappings=field_mappings
+            ) 
+
+            logging.info("Success creating indexer")
+            return indexer 
+        
+        except Exception as e:
+            logging.error(f"Error creating indexer: {e}")

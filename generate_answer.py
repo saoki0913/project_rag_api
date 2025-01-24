@@ -86,8 +86,28 @@ def vector_search_with_filter(
 
     return docs
 
+def build_filter_condition(folder_name: str, subfolder_name: str) -> str | None:
+    """
+    folder_name と subfolder_name の組み合わせに応じて、
+    OData フィルタ文字列 (folderName, subfolderName) を生成する。
+    folder_name = "FOLDER_ALL" フィルタリングなし (None)
+    それ以外の場合:
+        subfolder_name = "SUBFOLDER_ALL" フォルダ名のみフィルタリング："folderName eq 'xxx'"
+        subfolder_name != "SUBFOLDER_ALL" フォルダ名とサブフォルダ名でフィルタリング："folderName eq 'xxx' and subfolderName eq 'yyy'"
+    """
+    # folder_name が "FOLDER_ALL" の場合 
+    if folder_name == "FOLDER_ALL":
+        return None
 
-def generate_answer(user_question: str, project_name: str, folder_name: str=None):
+    # folder_name が FOLDER_ALL 以外の場合
+    if subfolder_name == "SUBFOLDER_ALL":
+        # folderName のみフィルタリング
+        return f"folderName eq '{folder_name}'"
+    else:
+        # folderName と subfolderName の両方でフィルタリング
+        return f"folderName eq '{folder_name}' and subfolderName eq '{subfolder_name}'"
+
+def generate_answer(user_question: str, project_name: str, folder_name: str=None, subfolder_name:str=None):
     """
     指定したプロジェクトに対して、フォルダ名でのフィルタリング機能を追加したベクトル検索を実行し、ユーザーの質問に対する回答を生成する 
     """
@@ -95,12 +115,9 @@ def generate_answer(user_question: str, project_name: str, folder_name: str=None
         index_name = f"{project_name}-index"
         # ipdb.set_trace()
 
-        # folderName が指定されていれば、"folderName eq '...'" の形式でフィルタを構築
-        filter_condition = None
-        if folder_name != "FOLDER_ALL":
-            filter_condition = f"folderName eq '{folder_name}'"
-
-        # vectorFilterModeを用いてベクトル検索にfolderNameでのフィルタリングを追加
+        # 条件に応じてフィルタリングを構成
+        filter_condition = build_filter_condition(folder_name, subfolder_name)
+        # vectorFilterModeを用いてベクトル検索にfolderName, subfolderNameでのフィルタリングを追加
         retrieved_docs = vector_search_with_filter(
             service_name=service_name,
             index_name=index_name,

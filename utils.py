@@ -2,6 +2,7 @@ from azure.cosmos import CosmosClient, exceptions
 import os
 import logging
 from SharePoint import SharePointAccessClass
+import ipdb
 
 
 # 環境変数から設定を取得
@@ -86,7 +87,7 @@ async def get_spo_url_by_project_name(project_name):
 def get_site_info_by_url(sites_data, spo_url):
     return next((site for site in sites_data.get("value", []) if site.get("webUrl") == spo_url), None)
 
-def fetch_folders(sharepoint, site_id, root_folder="root"):
+def fetch_folders(sharepoint, site_id, root_folder):
     """
     指定されたSharePointサイトのフォルダ一覧を取得する。
 
@@ -104,7 +105,6 @@ def fetch_folders(sharepoint, site_id, root_folder="root"):
     try:
         folder_list = []
         folders = sharepoint.get_folders(site_id, root_folder)  # 指定フォルダ以下を取得
-
         if folders and "value" in folders:
             folder_list = [folder['name'] for folder in folders["value"]]
             logging.info(f"フォルダ一覧取得成功: {folder_list}")
@@ -117,6 +117,35 @@ def fetch_folders(sharepoint, site_id, root_folder="root"):
         logging.error(f"フォルダ一覧取得エラー: {e}")
         raise
 
+def fetch_subfolders(sharepoint, site_id, root_folder):
+    """
+    指定されたSharePointサイトのフォルダ一覧を取得する。
+
+    Args:
+        sharepoint (SharePointAccessClass): SharePointアクセスクラスのインスタンス。
+        site_id (str): 対象のSharePointサイトのID。
+        root_folder (str): フォルダ階層の開始ポイント（デフォルトは"root"）。
+
+    Returns:
+        list: フォルダ名のリスト。
+
+    Raises:
+        Exception: フォルダの取得中にエラーが発生した場合。
+    """
+    try:
+        folder_list = []
+        folders = sharepoint.get_folders(site_id, root_folder)  # 指定フォルダ以下を取得
+        if folders and "value" in folders:
+            folder_list = [folder['name'] for folder in folders["value"]]
+            logging.info(f"フォルダ一覧取得成功: {folder_list}")
+        else:
+            logging.warning("フォルダが見つかりませんでした")
+
+        return folder_list
+
+    except Exception as e:
+        logging.error(f"フォルダ一覧取得エラー: {e}")
+        raise
 
 def delete_project_resources(
     project_name: str,

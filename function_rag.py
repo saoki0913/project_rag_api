@@ -15,7 +15,7 @@ import ipdb
 
 #import mylibraly
 from generate_answer import generate_answer, generate_answer_all
-from utils import check_spo_url, get_spo_url_by_project_name, get_site_info_by_url, fetch_folders, delete_project_resources
+from utils import check_spo_url, get_spo_url_by_project_name, get_site_info_by_url, fetch_folders, delete_project_resources, fetch_subfolders
 from SharePoint import SharePointAccessClass
 from indexing_service import ProjectIndexingService
 
@@ -52,17 +52,23 @@ class AnswerRequest(BaseModel):
     user_question: str
     project_name: str
     folder_name:str = None  # オプション項目（指定がない場合はNone）
+    subfolder_name:str = None  # オプション項目（指定がない場合はNone）
     conversation_id: str = None  # オプション項目（指定がない場合はNone）
 
 class RegisterProjectRequest(BaseModel):
     project_name: str
     spo_url: str
+    include_root_files:bool
 
 class DeleteProjectRequest(BaseModel):
     project_name: str
 
 class GetSpoFoldersRequest(BaseModel):
     project_name: str
+
+class GetSpoSubFoldersRequest(BaseModel):
+    project_name: str
+    folder_name: str
 
 # クライアントの初期化
 index_client = SearchIndexClient(azure_search_endpoint, AzureKeyCredential(azure_search_key))
@@ -95,12 +101,36 @@ async def get_spo_folders(request:GetSpoFoldersRequest):
             exit()               
 
         # フォルダ一覧を取得
-        folder_list = fetch_folders(sharepoint, site_id, root_folder="root")
+        root_folder="root"
+        folder_list = fetch_folders(sharepoint, site_id, root_folder)
+
         return JSONResponse(content={"folders": folder_list})
     
     except Exception as e:
         logging.error(f"フォルダ一覧取得エラー: {e}")
         raise HTTPException(status_code=500, detail="フォルダ一覧の取得中にエラーが発生しました")
+
+@app.post("/get_spo_subfolders")
+async def get_spo_subfolders(request:GetSpoSubFoldersRequest):
+    """
+    SPOのURLから、それに対応したサイト名を検索し、そのサイト内のフォルダ一覧を返すエンドポイント。
+    """
+    try:
+        # サイトIDを取得
+        project_name = request.project_name
+        folder_name = request.folder_name
+        spo_url = await get_spo_url_by_project_name(project_name)
+        sites_data = sharepoint.get_sites()
+
+        # サイト一覧から 'webUrl' が target_url に一致するサイトを検索
+        matching_site = get_site_info_by_url(sites_data, spo_url)
+        site_name = matching_site["name"]
+        subfolder_list = sharepoint.get_subfolders_in_folder(site_name, folder_name)
+        return JSONResponse(content={"subfolders": subfolder_list})
+    
+    except Exception as e:
+        logging.error(f"フォルダ一覧取得エラー: {e}")
+        raise HTTPException(status_code=500, detail="フォルダ一覧の取得中にエラーが発生しました")   
     
 
 @app.post("/resist_project")
@@ -111,6 +141,7 @@ async def resist_project(request: RegisterProjectRequest):
     try:
         project_name = request.project_name
         spo_url = request.spo_url
+        include_root_files = request.include_root_files
         spo_url = await check_spo_url(spo_url)
 
         #index, indexerの名前
@@ -146,7 +177,11 @@ async def resist_project(request: RegisterProjectRequest):
             await search_indexing.create_project_skillset_layout(project_name)
 
             # indexerの作成
-            indexer = search_indexing.create_project_indexer(project_name)
+            if include_root_files == True:
+                indexer = search_indexing.create_project_indexer(project_name)
+            else:
+                indexer = search_indexing.create_project_folder_indexer(project_name)
+            
             indexer_client.create_or_update_indexer(indexer)
 
             # Cosmos DB にプロジェクトを保存
@@ -207,13 +242,14 @@ async def answer(request: AnswerRequest):
         user_question = request.user_question
         project_name = request.project_name
         folder_name = request.folder_name
+        subfolder_name = request.subfolder_name
         project_name = project_name.lower() #プロジェクト名を小文字に変換
 
         # プロジェクトが選択されていないときはすべてのプロジェクトを検索して回答する．
         if project_name == "project_all":
             answer = generate_answer_all(user_question, container)
         else:
-            answer = generate_answer(user_question, project_name, folder_name)
+            answer = generate_answer(user_question, project_name, folder_name, subfolder_name)
         logging.info("質問への回答に成功しました")       
         return JSONResponse(answer)
     

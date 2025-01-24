@@ -4,6 +4,7 @@ from pathlib import Path
 import json
 from functools import cache
 import pprint as pp
+import ipdb
 
 class SharePointAccessClass:
     # 初期化
@@ -221,6 +222,7 @@ class SharePointAccessClass:
         target_site_id = self.get_site_id(target_site_name)
         # フォルダIDを取得
         folder_id = self.get_folder_id_from_tree(target_site_id, sharepoint_directory, 'root')
+       
 
         if folder_id:
             items = self.graph_api_get(
@@ -231,7 +233,56 @@ class SharePointAccessClass:
                 return None
         else:
             return "Folder not found"
+
+    # SharePoint上の指定フォルダのサブフォルダ一覧を取得する
+    def get_subfolders_in_folder(self, target_site_name, folder_name):
+        """
+        Get subfolders in a specified folder on SharePoint.
         
+        Parameters:
+            target_site_name (str): The name of the SharePoint site.
+            sharepoint_directory (list[str]): A list of folder names representing the path 
+                                            to the target folder in SharePoint.
+            
+        Returns:
+            list[dict]: A list of dictionary objects representing each subfolder's metadata.
+                        If the folder doesn't exist or has no subfolders, returns an empty list.
+        """
+        print("Get subfolders in the specified folder in SharePoint")
+
+        # 1. ターゲットサイトIDを取得
+        site_id = self.get_site_id(target_site_name)
+        if not site_id:
+            print(f"Site '{target_site_name}' not found.")
+            return []
+
+        # 2. 指定ディレクトリ内のフォルダIDを取得
+        folder_id = self.get_folder_id(site_id, folder_name, 'root')
+        if not folder_id:
+            print("Specified folder not found.")
+            return []
+
+        # 3. フォルダ内の子アイテム一覧を取得
+        children_endpoint = f'https://graph.microsoft.com/v1.0/sites/{site_id}/drive/items/{folder_id}/children'
+        response = self.graph_api_get(children_endpoint)
+        if response is None or response.status_code != 200:
+            print("Failed to get children from the specified folder.")
+            return []
+
+        items_json = response.json()
+        if "value" not in items_json:
+            return []
+
+        # 4. フォルダ(`folder`キーを持つアイテム)だけを抽出して返す
+        subfolders = []
+        for item in items_json["value"]:
+            # driveItemに folder プロパティがある場合、それはサブフォルダ
+            if "folder" in item:
+                subfolder = item["name"]
+                subfolders.append(subfolder)
+
+        return subfolders
+    
     # SharePoint上の指定フォルダの詳細情報取得
     def get_folder_details(self, target_site_name, sharepoint_directory):
         """

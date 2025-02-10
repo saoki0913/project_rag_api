@@ -134,8 +134,8 @@ def generate_answer(user_question: str, project_name: str, folder_name: str=None
         llm = AzureChatOpenAI(
             openai_api_key=openai.api_key,
             azure_endpoint=openai.azure_endpoint,
-            openai_api_version="2023-05-15",
-            azure_deployment="gpt-35-turbo",
+            openai_api_version="2024-08-01-preview",
+            azure_deployment="gpt-4o",
             temperature=0,
         )
 
@@ -159,6 +159,7 @@ def generate_answer(user_question: str, project_name: str, folder_name: str=None
 
         # RAG 用のプロンプトを取得
         prompt = hub.pull("rlm/rag-prompt")
+        ipdb.set_trace()
 
         # RAG チェーン構築
         rag_chain_from_docs = (
@@ -264,8 +265,8 @@ def generate_answer_all(user_question, container):
         llm = AzureChatOpenAI(
             openai_api_key=openai.api_key,
             azure_endpoint=openai.azure_endpoint,
-            openai_api_version="2023-05-15",
-            azure_deployment="gpt-35-turbo",
+            openai_api_version="2024-08-01-preview",
+            azure_deployment="gpt-4o",
             temperature=0,
         )
 

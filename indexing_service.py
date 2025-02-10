@@ -19,10 +19,8 @@ from azure.search.documents.indexes.models import (
     AzureOpenAIParameters,
     # スコアリングプロファイル実装のためのクラス
     ScoringProfile,
-    TextWeights,
     FreshnessScoringFunction,
     FreshnessScoringParameters,
-    ScoringFunction,
     ScoringFunctionInterpolation,
     # skillset
     SplitSkill,
@@ -41,7 +39,6 @@ from azure.search.documents.indexes.models import (
     SearchIndexer,
     IndexingSchedule,
     IndexingParameters,
-    IndexingParametersConfiguration ,
     FieldMapping,
     FieldMappingFunction,
 )

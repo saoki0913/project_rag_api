@@ -1,4 +1,5 @@
 import azure.functions as func
+
 import openai
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
@@ -11,7 +12,6 @@ from azure.core.credentials import AzureKeyCredential
 from azure.search.documents.indexes import SearchIndexClient
 from azure.search.documents.indexes import SearchIndexerClient
 from azure.cosmos import CosmosClient, exceptions
-import ipdb
 
 #import mylibraly
 from generate_answer import generate_answer, generate_answer_all
@@ -98,7 +98,7 @@ async def get_spo_folders(request:GetSpoFoldersRequest):
         logging.info(f"サイト '{site_name}' のIDを取得しました")
         if not site_id:
             logging.error(f"サイト '{site_name}' が見つかりませんでした")
-            exit()               
+            raise HTTPException(status_code=404, detail=f"サイト '{site_name}' が見つかりませんでした")       
 
         # フォルダ一覧を取得
         root_folder="root"
@@ -199,6 +199,13 @@ async def resist_project(request: RegisterProjectRequest):
         return JSONResponse(content={"message": f"プロジェクト '{project_name}' 登録済み"})
     except Exception as e:
         logging.error(f"プロジェクト登録エラー: {e}")
+        # 登録エラーが発生した場合には、プロジェクトに関する要素をすべて削除する
+        delete_project_resources(
+                project_name,
+                indexer_client,
+                index_client,
+                container
+            )
         raise HTTPException(status_code=500, detail="プロジェクト登録中にエラーが発生しました")
 
 @app.get("/projects")

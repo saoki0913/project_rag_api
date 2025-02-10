@@ -1,9 +1,7 @@
-from azure.cosmos import CosmosClient, exceptions
+from azure.cosmos import CosmosClient
 import os
 import logging
 from SharePoint import SharePointAccessClass
-import ipdb
-
 
 # 環境変数から設定を取得
 cosmos_endpoint = os.getenv("COSMOS_DB_ENDPOINT")
@@ -49,7 +47,7 @@ async def check_spo_url(input_url: str) -> str:
     elif input_url.startswith(teams_pattern):
         remaining_part = input_url[len(teams_pattern):]   
         project_name = remaining_part.split("/")[0]   
-        return f"{teams_pattern}{project_name}"
+        return f"{spo_pattern}{project_name}"
 
     else:
         # 想定外の入力の場合は空文字列やエラーを返す
